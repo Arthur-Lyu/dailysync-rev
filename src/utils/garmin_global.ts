@@ -73,6 +73,7 @@ export const getGaminGlobalClient = async (): Promise<GarminClientType> => {
     } catch (err) {
         console.error(err);
         core.setFailed(err);
+        throw err;  // ← 加这一行
     }
 };
 
