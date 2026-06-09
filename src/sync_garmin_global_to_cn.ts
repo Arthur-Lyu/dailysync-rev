@@ -1,8 +1,10 @@
+// ✅ 适配你本地文件的导入方式
 import GarminConnect from "@gooin/garmin-connect";
 import * as fs from "fs";
 import * as path from "path";
-import { GARMIN_SYNC_NUM } from "./constant";
-import { getGarminCNClient } from "./rq";
+// ✅ 改成你本地实际有的变量/函数名
+import { SYNC_NUM } from "./constant";  // 改成你constant.ts里实际的名字
+import { getGarminCN } from "./rq";      // 改成你rq.ts里实际导出的名字
 
 // 格式化日期
 function formatDate(dateStr: string) {
@@ -12,10 +14,13 @@ function formatDate(dateStr: string) {
 
 // 获取国际区客户端 + 精准捕获限流/密码错误
 async function getGaminGlobalClient() {
-  const client = new GarminConnect();
   try {
     console.log("🔐 正在登录佳明国际区...");
-    await client.login(process.env.GARMIN_GLOBAL_USERNAME!, process.env.GARMIN_GLOBAL_PASSWORD!);
+    // ✅ 适配新版本包：去掉new，直接调用
+    const client = await GarminConnect({
+      username: process.env.GARMIN_GLOBAL_USERNAME!,
+      password: process.env.GARMIN_GLOBAL_PASSWORD!
+    });
     console.log("✅ 佳明国际区 登录成功");
     return client;
   } catch (e: any) {
@@ -52,10 +57,10 @@ export async function syncGarminGlobal2GarminCN() {
     return;
   }
 
-  // 2. 获取中国区客户端
+  // 2. 获取中国区客户端 ✅ 适配你本地函数名
   let clientCN;
   try {
-    clientCN = await getGarminCNClient();
+    clientCN = await getGarminCN();
     console.log("✅ 佳明中国区 登录成功");
   } catch (e) {
     console.error("❌ 中国区登录失败：", e);
@@ -64,9 +69,9 @@ export async function syncGarminGlobal2GarminCN() {
   }
 
   try {
-    // 3. 获取国际区运动数据（控制数量，避免限流）
-    console.log(`📥 从国际区获取最近 ${GARMIN_SYNC_NUM} 条运动记录...`);
-    const globalActs = await clientGlobal.getActivities(0, Number(GARMIN_SYNC_NUM));
+    // 3. 获取国际区运动数据 ✅ 适配你本地变量名
+    console.log(`📥 从国际区获取最近 ${SYNC_NUM || 10} 条运动记录...`);
+    const globalActs = await clientGlobal.getActivities(0, Number(SYNC_NUM || 10));
     console.log(`✅ 获取成功，共 ${globalActs.length} 条记录`);
 
     if (globalActs.length === 0) {
@@ -118,7 +123,7 @@ export async function syncGarminGlobal2GarminCN() {
 
     // 保存会话（保持原有逻辑）
     const sessionPath = path.resolve(__dirname, "../../.garmin-session");
-    fs.writeFileSync(sessionPath, JSON.stringify({ global: clientGlobal.getSession(), cn: clientCN.getSession() }));
+    fs.writeFileSync(sessionPath, JSON.stringify({ global: clientGlobal.getSession?.() || {}, cn: clientCN.getSession?.() || {} }));
     console.log("💾 会话信息已保存");
 
   } catch (e: any) {
