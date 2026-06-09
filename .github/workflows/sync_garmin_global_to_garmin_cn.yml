@@ -1,16 +1,19 @@
 name: Sync Garmin Global to Garmin CN
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # 保留手动触发
   schedule:
-    #  每6小时检查一次
-    - cron: "0 */6 * * *"
+    # ✅ 改为：每天1次 UTC 3点 → 国内早11点，避开高峰
+    - cron: "0 3 * * *"
 
 env:
   GARMIN_USERNAME: ${{ secrets.GARMIN_USERNAME }}
   GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
   GARMIN_GLOBAL_USERNAME: ${{ secrets.GARMIN_GLOBAL_USERNAME }}
   GARMIN_GLOBAL_PASSWORD: ${{ secrets.GARMIN_GLOBAL_PASSWORD }}
+  GARMIN_SYNC_NUM: "10"  # ✅ 单次只同步10条，和官网一致
+  # ✅ 解决 Node.js 淘汰警告
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   build:
@@ -18,15 +21,45 @@ jobs:
     name: Sync Garmin Global to Garmin CN
     permissions:
       contents: write
+    concurrency:
+      group: garmin-sync
+      cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      # ✅ 升级到最新版 Action，解决版本警告
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"  # 长期支持版
           cache: "yarn"
+
+      # ✅ 随机延迟 0~10分钟，错开所有用户的触发高峰
+      - name: Random Delay
+        run: |
+          DELAY=$((RANDOM % 600))
+          echo "Delay ${DELAY}s to avoid traffic peak..."
+          sleep ${DELAY}
+
       - run: yarn
-      - run: yarn sync_global
-        timeout-minutes: 10
+
+      # ✅ 双重保险：脚本内重试 + 工作流重试，限流必过
+      - name: Run Sync
+        run: |
+          for attempt in {1..3}; do
+            echo "===== Attempt $attempt/3 ====="
+            yarn sync_global
+            if [ $? -eq 0 ]; then
+              echo "✅ Sync SUCCESS!"
+              exit 0
+            fi
+            echo "❌ Failed, wait 12min before retry..."
+            sleep 720  # 等12分钟，足够佳明限流窗口重置
+          done
+          echo "❌ All attempts failed"
+          exit 1
+        timeout-minutes: 40  # 总时长放宽到40分钟
+
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Save Garmin Session
+          skip_if_no_changes: true
