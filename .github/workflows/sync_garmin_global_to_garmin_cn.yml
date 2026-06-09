@@ -3,7 +3,6 @@ name: Sync Garmin Global to Garmin CN
 on:
   workflow_dispatch:
   schedule:
-    #  每6小时检查一次
     - cron: "0 */6 * * *"
 
 env:
@@ -11,6 +10,7 @@ env:
   GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
   GARMIN_GLOBAL_USERNAME: ${{ secrets.GARMIN_GLOBAL_USERNAME }}
   GARMIN_GLOBAL_PASSWORD: ${{ secrets.GARMIN_GLOBAL_PASSWORD }}
+  GARMIN_SYNC_NUM: "3"
 
 jobs:
   build:
@@ -19,10 +19,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
           cache: "yarn"
       - run: yarn
       - run: yarn sync_global
@@ -30,3 +30,4 @@ jobs:
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Save Garmin Session
+          skip_if_no_changes: true
