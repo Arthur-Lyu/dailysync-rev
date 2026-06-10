@@ -10,6 +10,8 @@ env:
   GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
   GARMIN_GLOBAL_USERNAME: ${{ secrets.GARMIN_GLOBAL_USERNAME }}
   GARMIN_GLOBAL_PASSWORD: ${{ secrets.GARMIN_GLOBAL_PASSWORD }}
+  GARMIN_GLOBAL_OAUTH1: ${{ secrets.GARMIN_GLOBAL_OAUTH1 }}
+  GARMIN_GLOBAL_OAUTH2: ${{ secrets.GARMIN_GLOBAL_OAUTH2 }}
   GARMIN_SYNC_NUM: "10"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -27,33 +29,11 @@ jobs:
           node-version: "20"
           cache: "yarn"
 
-      - name: Restore Garmin Session DB
-        uses: actions/cache/restore@v4
-        with:
-          path: ./db
-          key: garmin-db-${{ github.run_id }}
-          restore-keys: garmin-db-
-
       - run: yarn
 
       - name: Run Sync
-        run: |
-          for attempt in {1..3}; do
-            echo "===== Attempt $attempt/3 ====="
-            yarn sync_global && echo "✅ Sync SUCCESS!" && exit 0
-            echo "❌ Failed, wait 10min before retry..."
-            sleep 600
-          done
-          echo "❌ All 3 attempts failed"
-          exit 1
-        timeout-minutes: 45
-
-      - name: Save Garmin Session DB
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: ./db
-          key: garmin-db-${{ github.run_id }}
+        run: yarn sync_global
+        timeout-minutes: 10
 
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
