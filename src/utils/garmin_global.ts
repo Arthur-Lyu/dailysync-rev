@@ -9,6 +9,48 @@ import { GarminClientType } from './type';
 import { downloadGarminActivity, uploadGarminActivity } from './garmin_common';
 import { number2capital } from './number_tricks';
 const core = require('@actions/core');
+// 自动把新 token 写回 GitHub Secrets
+async function saveTokenToSecrets(oauth1: any, oauth2: any) {
+    const ghPat = process.env.GH_PAT;
+    const repo = process.env.GITHUB_REPOSITORY;
+    if (!ghPat || !repo) return;
+
+    try {
+        const { Octokit } = require('@octokit/rest');
+        const sodium = require('libsodium-wrappers');
+        await sodium.ready;
+
+        const octokit = new Octokit({ auth: ghPat });
+        const [owner, repoName] = repo.split('/');
+
+        const { data: publicKey } = await octokit.actions.getRepoPublicKey({ owner, repo: repoName });
+
+        const encryptSecret = (value: string) => {
+            const binkey = sodium.from_base64(publicKey.key, sodium.base64_variants.ORIGINAL);
+            const binsec = sodium.from_string(value);
+            const encBytes = sodium.crypto_box_seal(binsec, binkey);
+            return sodium.to_base64(encBytes, sodium.base64_variants.ORIGINAL);
+        };
+
+        await octokit.actions.createOrUpdateRepoSecret({
+            owner, repo: repoName,
+            secret_name: 'GARMIN_GLOBAL_OAUTH1',
+            encrypted_value: encryptSecret(JSON.stringify(oauth1)),
+            key_id: publicKey.key_id,
+        });
+
+        await octokit.actions.createOrUpdateRepoSecret({
+            owner, repo: repoName,
+            secret_name: 'GARMIN_GLOBAL_OAUTH2',
+            encrypted_value: encryptSecret(JSON.stringify(oauth2)),
+            key_id: publicKey.key_id,
+        });
+
+        console.log('✅ Token 已自动写回 GitHub Secrets');
+    } catch (e) {
+        console.warn('⚠️ 写回 Secrets 失败（不影响本次同步）：', e);
+    }
+}
 import _ from 'lodash';
 import { getSessionFromDB, initDB, saveSessionToDB, updateSessionToDB } from './sqlite';
 import { getSessionFromEnv } from './garmin_session_env';
@@ -69,6 +111,7 @@ export const getGaminGlobalClient = async (): Promise<GarminClientType> => {
             throw Error('佳明国际区登录失败，请检查填入的账号密码或您的网络环境')
         }
         console.log('Garmin userInfo global', { fullName, emailAddress, location });
+        await saveTokenToSecrets(GCClient.exportToken().oauth1, GCClient.exportToken().oauth2);
         return GCClient;
     } catch (err) {
         console.error(err);
