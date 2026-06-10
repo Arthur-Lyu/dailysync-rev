@@ -9,8 +9,11 @@ env:
   GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
   GARMIN_GLOBAL_USERNAME: ${{ secrets.GARMIN_GLOBAL_USERNAME }}
   GARMIN_GLOBAL_PASSWORD: ${{ secrets.GARMIN_GLOBAL_PASSWORD }}
+  GARMIN_GLOBAL_OAUTH1: ${{ secrets.GARMIN_GLOBAL_OAUTH1 }}
+  GARMIN_GLOBAL_OAUTH2: ${{ secrets.GARMIN_GLOBAL_OAUTH2 }}
   GARMIN_MIGRATE_NUM: ${{ secrets.GARMIN_MIGRATE_NUM }}
   GARMIN_MIGRATE_START: ${{ secrets.GARMIN_MIGRATE_START }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   build:
@@ -19,13 +22,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'yarn'
+          node-version: "20"
+          cache: "yarn"
       - run: yarn
       - run: yarn migrate_garmin_cn_to_global
+        timeout-minutes: 30
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: Save Garmin Session
