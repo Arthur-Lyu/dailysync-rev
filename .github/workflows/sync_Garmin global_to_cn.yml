@@ -3,7 +3,7 @@ name: Sync Garmin Global to CN
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "*/5 * * * *"
 
 env:
   GARMIN_USERNAME: ${{ secrets.GARMIN_USERNAME }}
